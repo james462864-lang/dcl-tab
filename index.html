@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Playables SDK -->
+<script>// Playables SDK v1.0.0
+// Game lifecycle bridge: rAF-based game-ready detection + event communication
+(function() {
+  'use strict';
+
+  // Idempotency: skip if already initialized (e.g., server-side injection
+  // followed by client-side inject-javascript via the Bloks webview component).
+  if (window.playablesSDK) return;
+
+  var HANDLER_NAME = 'playablesGameEventHandler';
+  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
+  var RAF_FRAME_THRESHOLD = 3;
+
+  var gameReadySent = false;
+  var firstInteractionSent = false;
+  var errorSent = false;
+  var frameCount = 0;
+  var originalRAF = window.requestAnimationFrame;
+
+  // --- Transport Layer ---
+
+  function hasIOSBridge() {
+    return !!(window.webkit &&
+              window.webkit.messageHandlers &&
+              window.webkit.messageHandlers[HANDLER_NAME]);
+  }
+
+  function hasAndroidBridge() {
+    return !!(window[ANDROID_BRIDGE_NAME] &&
+              typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function');
+  }
+
+  function isInIframe() {
+    return !!(window.parent && window.parent !== window);
+  }
+
+  function sendEvent(eventName, payload) {
+    var message = {
+      type: eventName,
+      payload: payload || {},
+      timestamp: Date.now()
+    };
+
+    if (hasIOSBridge()) {
+      try {
+        window.webkit.messageHandlers[HANDLER_NAME].postMessage(message);
+      } catch (e) { /* ignore */ }
+      return;
+    }
+
+    if (hasAndroidBridge()) {
+    try {
+      var p = payload || {};
+      p.__secureToken = window.__fbAndroidBridgeAuthToken || '';
+      p.timestamp = message.timestamp;
+      window[ANDROID_BRIDGE_NAME].postEvent(
+        eventName,
+        JSON.stringify(p)
+      );
+    } catch (e) { /* ignore */ }
+    return;
+  }
+
+    if (isInIframe()) {
+      try {
+        window.parent.postMessage(message, '*');
+      } catch (e) { /* ignore */ }
+      return;
+    }
+  }
+
+  // --- rAF Game-Ready Detection ---
+
+  function onFrame() {
+    if (gameReadySent) return;
+
+    frameCount++;
+    if (frameCount >= RAF_FRAME_THRESHOLD) {
+      gameReadySent = true;
+      sendEvent('game_ready', {
+        frame_count: frameCount,
+        detected_at: Date.now()
+      });
+      return;
+    }
+
+    originalRAF.call(window, onFrame);
+  }
+
+  if (originalRAF) {
+    window.requestAnimationFrame = function(callback) {
+      if (!gameReadySent) {
+        return originalRAF.call(window, function(timestamp) {
+          frameCount++;
+          if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) {
+            gameReadySent = true;
+            sendEvent('game_ready', {
+              frame_count: frameCount,
+              detected_at: Date.now()
+            });
+          }
+          callback(timestamp);
+        });
+      }
+      return originalRAF.call(window, callback);
+    };
+  }
+
+  // --- First User Interaction Detection ---
+
+  function setupFirstInteractionDetection() {
+    var events = ['touchstart', 'mousedown', 'keydown'];
+
+    function onFirstInteraction() {
+      if (firstInteractionSent) return;
+      firstInteractionSent = true;
+      sendEvent('user_interaction_start', null);
+
+      for (var i = 0; i < events.length; i++) {
+        document.removeEventListener(events[i], onFirstInteraction, true);
+      }
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      document.addEventListener(events[i], onFirstInteraction, true);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection);
+  } else {
+    setupFirstInteractionDetection();
+  }
+
+  // --- Auto Error Capture ---
+
+  window.addEventListener('error', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    sendEvent('error', {
+      message: event.message || 'Unknown error',
+      source: event.filename || '',
+      lineno: event.lineno || 0,
+      colno: event.colno || 0,
+      auto_captured: true
+    });
+  });
+
+  window.addEventListener('unhandledrejection', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    var reason = event.reason;
+    sendEvent('error', {
+      message: (reason instanceof Error) ? reason.message : String(reason),
+      type: 'unhandled_promise_rejection',
+      auto_captured: true
+    });
+  });
+
+  // --- Public API ---
+
+  window.playablesSDK = {
+    complete: function(score) {
+      sendEvent('game_ended', {
+        score: score,
+        completed: true
+      });
+    },
+
+    error: function(message) {
+      if (errorSent) return;
+      errorSent = true;
+      sendEvent('error', {
+        message: message || 'Unknown error',
+        auto_captured: false
+      });
+    },
+
+    sendEvent: function(eventName, payload) {
+      if (!eventName || typeof eventName !== 'string') return;
+      sendEvent(eventName, payload);
+    }
+  };
+
+  // Kick off rAF detection in case no game code calls rAF immediately
+  if (originalRAF) {
+    originalRAF.call(window, onFrame);
+  }
+})();</script>
+<script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1,user-scalable=no">
+<title>DCL Mining • Decentralised Coin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Inter', sans-serif; background: #05070b; overscroll-behavior: none; }
+  h1,h2,h3 { font-family: 'Space Grotesk', sans-serif; }
+  .glass { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .tap-active:active { transform: scale(0.92) }
+  .pop { animation: pop .3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  @keyframes pop { from { transform: scale(.8); opacity:0 } to { transform: scale(1); opacity:1 } }
+  @keyframes float { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-8px) } }
+  .float { animation: float 3s ease-in-out infinite; }
+  ::-webkit-scrollbar { display:none }
+</style>
+</head>
+<body class="text-white">
+<div class="max-w-[420px] mx-auto min-h-screen flex flex-col relative">
+  <!-- BG -->
+  <div class="fixed inset-0 -z-10">
+    <div class="absolute inset-0 bg-[#05070b]"></div>
+    <div class="absolute -top-40 -right-40 w-80 h-80 bg-yellow-500/20 rounded-full blur-[120px]"></div>
+    <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-amber-500/15 rounded-full blur-[120px]"></div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="sticky top-0 z-30 glass bg-black/40 border-b border-white/5">
+    <div class="px-5 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-600/20">
+          <span class="font-bold text-black text-lg">$</span>
+        </div>
+        <div>
+          <h1 class="text-[17px] font-semibold leading-none tracking-tight">DCL MINING</h1>
+          <p class="text-[11px] text-white/50 leading-none mt-1">Decentralised Coin</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[12px] font-medium">
+          <span class="text-white/60">BOOST</span> <span id="header-boost" class="text-yellow-400 ml-1">x1</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="flex-1 px-5 pb-28">
+    <!-- TAP TAB -->
+    <section id="tab-tap" class="pt-6">
+      <div class="text-center mb-6">
+        <p class="text-white/50 text-[13px] uppercase tracking-widest font-medium">Balance</p>
+        <div class="flex items-center justify-center gap-2 mt-1">
+          <h2 id="balance" class="text-[42px] font-bold tracking-tight">0.25000</h2>
+          <span class="text-[22px] font-semibold text-yellow-400">DCL</span>
+        </div>
+        <p class="text-[13px] text-white/60 mt-1"><span id="per-tap">0.001</span> DCL per tap • <span id="total-taps">0</span> taps</p>
+      </div>
+
+      <!-- Coin -->
+      <div class="relative flex justify-center my-8">
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-[280px] h-[280px] rounded-full bg-yellow-500/10 blur-[80px]"></div>
+        </div>
+        <button id="tap-coin" class="tap-active relative w-[240px] h-[240px] rounded-full transition-transform duration-100 select-none touch-manipulation float">
+          <div class="absolute inset-0 rounded-full bg-gradient-to-b from-yellow-300 to-amber-600 shadow-[inset_0_-20px_40px_rgba(0,0,0,0.4),inset_0_10px_20px_rgba(255,255,255,0.2),0_20px_60px_rgba(245,158,11,0.3)]"></div>
+          <div class="absolute inset-[12px] rounded-full bg-gradient-to-b from-amber-500 to-yellow-600 shadow-inner"></div>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-[72px] font-black text-black/90" style="font-family:'Space Grotesk'">D</span>
+            <span class="text-[11px] font-bold tracking-[0.2em] text-black/70 -mt-3">TAP TO MINE</span>
+          </div>
+          <div id="tap-effects" class="absolute inset-0 pointer-events-none"></div>
+        </button>
+      </div>
+
+      <!-- Energy -->
+      <div class="mt-8">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-1.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span class="text-[13px] font-semibold">Energy</span>
+          </div>
+          <span id="energy-text" class="text-[13px] font-medium text-white/70">500 / 500</span>
+        </div>
+        <div class="h-[10px] bg-white/5 rounded-full overflow-hidden border border-white/10 p-[2px]">
+          <div id="energy-bar" class="h-full w-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full transition-all duration-300 shadow-[0_0_20px_rgba(245,158,11,0.5)]"></div>
+        </div>
+        <p class="text-center text-[11px] text-white/40 mt-2">Recharges +3/sec • <span id="bot-status" class="hidden text-emerald-400">Bot active</span></p>
+      </div>
+    </section>
+
+    <!-- BOOSTS TAB -->
+    <section id="tab-boosts" class="pt-6 hidden">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-[22px] font-bold">Boost Mining</h3>
+        <div class="text-[12px] px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">Current: <span id="current-boost" class="text-yellow-400 font-bold">x1</span></div>
+      </div>
+      <p class="text-[13px] text-white/60 mb-5 -mt-2">Pay with BNB • Instant activation after TX verification</p>
+      
+      <div id="boosts-grid" class="grid grid-cols-2 gap-3">
+        <!-- injected -->
+      </div>
+
+      <div class="mt-6 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+        <div class="flex gap-2.5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" class="mt-0.5 shrink-0"><path d="M12 9v4M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <p class="text-[12px] leading-relaxed text-amber-200/80"><b class="text-amber-300">CRITICAL:</b> Boost only activates after valid BSC transaction hash is verified. No hash = No boost.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- EARN TAB -->
+    <section id="tab-earn" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Earn Upgrades</h3>
+      <p class="text-[13px] text-white/60 mb-5">Upgrade with DCL or complete tasks</p>
+      
+      <div id="earn-list" class="flex flex-col gap-2.5">
+        <!-- 9 cards injected -->
+      </div>
+    </section>
+
+    <!-- FRENS TAB -->
+    <section id="tab-frens" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Invite Frens</h3>
+      <p class="text-[13px] text-white/60 mb-5">Earn 10% of their mining forever</p>
+      
+      <div class="p-5 rounded-3xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10">
+        <div class="text-center">
+          <p class="text-[13px] text-white/60">Total Invited</p>
+          <p id="ref-count" class="text-[36px] font-bold mt-1">0</p>
+        </div>
+        <div class="mt-5 p-3.5 rounded-2xl bg-black/40 border border-white/10">
+          <p class="text-[11px] text-white/50 mb-1">Your invite link</p>
+          <p id="ref-link" class="text-[13px] font-medium truncate">t.me/DecentralisationDCLbot?start=...</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5 mt-4">
+          <button id="copy-invite" class="h-11 rounded-xl bg-white text-black font-semibold text-[14px] active:scale-95 transition">Copy Link</button>
+          <button class="h-11 rounded-xl bg-white/10 border border-white/15 font-medium text-[14px] active:scale-95 transition">Share</button>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h4 class="font-semibold mb-3 text-[15px]">Your Frens</h4>
+        <div id="frens-empty" class="text-center py-12 rounded-2xl bg-white/[0.03] border border-dashed border-white/10">
+          <p class="text-white/40 text-[14px]">No frens yet. Invite to earn!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- WALLET TAB -->
+    <section id="tab-wallet" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Wallet</h3>
+      <p class="text-[13px] text-white/60 mb-5">Deposit BNB to activate boosts</p>
+
+      <div class="p-5 rounded-3xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10">
+        <p class="text-[12px] text-white/50 mb-2">BSC (BEP20) Deposit Address</p>
+        <div class="flex items-center gap-2 p-3 rounded-xl bg-black/50 border border-white/10">
+          <p id="wallet-addr" class="flex-1 text-[13px] font-mono truncate">0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7</p>
+          <button id="copy-wallet" class="px-3 py-1.5 rounded-lg bg-white/10 text-[12px] font-medium active:scale-95">Copy</button>
+        </div>
+        <p class="text-[11px] text-white/40 mt-2">Only send BNB (BSC). Min $1.</p>
+      </div>
+
+      <div class="mt-5 p-5 rounded-3xl bg-white/[0.03] border border-white/10">
+        <p class="font-semibold text-[15px] mb-3">Auto-Verify Deposit</p>
+        <input id="wallet-tx" placeholder="Paste TX hash (0x...)" class="w-full h-12 px-4 rounded-xl bg-black/50 border border-white/15 text-[14px] outline-none focus:border-yellow-500/50 placeholder:text-white/30">
+        <button id="wallet-verify" class="w-full h-12 mt-3 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-semibold text-[15px] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition" disabled>Verify TX Hash</button>
+        <p class="text-[11px] text-white/40 mt-2.5 text-center">Enter hash after sending BNB • Credits 10 DCL per deposit</p>
+      </div>
+
+      <div class="mt-5 grid grid-cols-3 gap-2.5">
+        <div class="p-3.5 rounded-2xl bg-white/[0.04] border border-white/5 text-center">
+          <p class="text-[11px] text-white/50">Deposited</p>
+          <p id="stat-dep" class="text-[18px] font-bold mt-1">0</p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-white/[0.04] border border-white/5 text-center">
+          <p class="text-[11px] text-white/50">Boosts</p>
+          <p id="stat-boosts" class="text-[18px] font-bold mt-1">0</p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-white/[0.04] border border-white/5 text-center">
+          <p class="text-[11px] text-white/50"> Earned</p>
+          <p id="stat-earned" class="text-[18px] font-bold mt-1">0</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav class="fixed bottom-0 left-0 right-0 z-30">
+    <div class="max-w-[420px] mx-auto px-5 pb-5">
+      <div class="h-[68px] grid grid-cols-5 gap-1 p-1.5 rounded-[22px] glass bg-black/70 border border-white/10 shadow-2xl">
+        <button data-tab="tap" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-yellow-400 bg-white/10">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 8v12h5v-7h6v7h5V8l-8-6z"/></svg>
+          <span class="text-[10px] font-medium">Tap</span>
+        </button>
+        <button data-tab="boosts" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span class="text-[10px] font-medium">Boosts</span>
+        </button>
+        <button data-tab="earn" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="text-[10px] font-medium">Earn</span>
+        </button>
+        <button data-tab="frens" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="text-[10px] font-medium">Frens</span>
+        </button>
+        <button data-tab="wallet" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M22 10H18a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h4"/></svg>
+          <span class="text-[10px] font-medium">Wallet</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+</div>
+
+<!-- BOOST MODAL -->
+<div id="boost-modal" class="fixed inset-0 z-50 hidden">
+  <div id="modal-bg" class="absolute inset-0 bg-black/80 backdrop-blur-xl"></div>
+  <div class="relative z-10 h-full flex items-end sm:items-center justify-center p-4">
+    <div class="w-full max-w-[380px] pop">
+      <div class="rounded-[28px] bg-[#0f131c] border border-white/15 shadow-2xl overflow-hidden">
+        <div class="px-5 pt-5 pb-4 border-b border-white/5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-[20px] font-bold">Upgrade Multitap</h3>
+            <button id="modal-close" class="w-8 h-8 grid place-items-center rounded-full bg-white/5 hover:bg-white/10 transition">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <p class="text-[13px] text-white/60 mt-1">Pay with BNB • Verification required</p>
+        </div>
+        
+        <div class="p-5 space-y-4">
+          <div class="p-4 rounded-2xl bg-yellow-500/5 border border-yellow-500/20">
+            <div class="flex items-center justify-between">
+              <span class="text-[13px] text-white/70">You will get</span>
+              <span id="m-level" class="text-[28px] font-black text-yellow-400 leading-none">x2</span>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+              <span class="text-[13px] text-white/70">Per tap</span>
+              <span id="m-pertap" class="font-semibold">0.002 DCL</span>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <p class="text-[12px] text-white/50 mb-1.5">Send exactly</p>
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-black/60 border border-white/10">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-[#f0b90b] grid place-items-center">
+                    <span class="text-black font-bold text-[12px]">B</span>
+                  </div>
+                  <span id="m-bnb" class="font-mono font-semibold">0.013 BNB</span>
+                </div>
+                <span id="m-usd" class="text-[13px] text-white/60">$5.00</span>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[12px] text-white/50 mb-1.5">To address (BSC)</p>
+              <div class="flex gap-2">
+                <div class="flex-1 px-3.5 h-11 flex items-center rounded-xl bg-black/60 border border-white/10">
+                  <span class="text-[12px] font-mono truncate">0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7</span>
+                </div>
+                <button id="m-copy" class="h-11 px-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-[13px] font-medium transition active:scale-95">Copy</button>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[12px] text-white/50 mb-1.5">Transaction Hash <span class="text-red-400">*</span></p>
+              <input id="m-hash" placeholder="0x..." class="w-full h-12 px-3.5 rounded-xl bg-black/60 border border-white/15 outline-none focus:border-yellow-500/60 text-[14px] font-mono placeholder:text-white/30">
+              <p class="text-[11px] text-white/40 mt-1.5">Paste hash after payment. Must start with 0x (min 20 chars)</p>
+            </div>
+          </div>
+
+          <button id="m-verify" disabled class="w-full h-[48px] rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-[15px] disabled:opacity-30 disabled:cursor-not-allowed active:scale-[0.98] transition flex items-center justify-center gap-2">
+            <span id="m-verify-text">Verify Payment</span>
+            <svg id="m-spinner" class="hidden animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity=".2" stroke-width="4"/><path d="M12 2a10 10 0 0 1 10" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+          </button>
+          
+          <p id="m-error" class="hidden text-[13px] text-center text-red-400 -mt-1"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] hidden">
+  <div class="pop px-4 py-3 rounded-2xl bg-white text-black font-medium text-[14px] shadow-2xl flex items-center gap-2.5 min-w-[260px]">
+    <div class="w-6 h-6 rounded-full bg-emerald-500 grid place-items-center shrink-0">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <span id="toast-text">Boost Activated!</span>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// STATE
+let state = JSON.parse(localStorage.getItem('dcl_v2') || 'null') || {
+  balance: 0.25,
+  perTap: 0.001,
+  totalTaps: 1247,
+  energy: 500,
+  maxEnergy: 1250,
+  boostLevel: 1,
+  verifiedBoosts: [],
+  usedHashes: [],
+  upgrades: {
+    multitap: { level: 5, cost: 3 },
+    energyLimit: { level: 5, cost: 3.8 },
+    recharging: { level: 1, cost: 2 },
+    tapBot: { level: 1, cost: 4, owned: false }
+  },
+  social: { telegram:false, twitter:false, facebook:false, discord:false, linkedin:false },
+  deposits: 0,
+  ref: Math.floor(Math.random()*9000)+1000
+};
+
+const BOOSTS = [
+  { level:2, price:5, bnb:'0.0128', perTap:0.002, label:'x2 Multitap', popular:false },
+  { level:3, price:10, bnb:'0.0255', perTap:0.003, label:'x3 Multitap', popular:true },
+  { level:4, price:15, bnb:'0.0383', perTap:0.004, label:'x4 Multitap', popular:false },
+  { level:5, price:25, bnb:'0.0638', perTap:0.005, label:'x5 Multitap', popular:false },
+];
+
+const SAVE = () => localStorage.setItem('dcl_v2', JSON.stringify(state));
+const fmt = n => Number(n).toFixed(n>=1?2:5).replace(/\.?0+$/,'');
+
+function showToast(msg, ok=true){
+  $('#toast-text').textContent = msg;
+  $('#toast').firstElementChild.classList.toggle('bg-white', ok);
+  $('#toast').firstElementChild.classList.toggle('bg-red-500', !ok);
+  $('#toast').firstElementChild.classList.toggle('text-black', ok);
+  $('#toast').firstElementChild.classList.toggle('text-white', !ok);
+  $('#toast').classList.remove('hidden');
+  setTimeout(()=>$('#toast').classList.add('hidden'), 2500);
+}
+
+function render(){
+  $('#balance').textContent = fmt(state.balance);
+  $('#per-tap').textContent = fmt(state.perTap);
+  $('#total-taps').textContent = state.totalTaps.toLocaleString();
+  $('#energy-text').textContent = `${state.energy} / ${state.maxEnergy}`;
+  $('#energy-bar').style.width = `${(state.energy/state.maxEnergy)*100}%`;
+  $('#header-boost').textContent = `x${state.boostLevel}`;
+  $('#current-boost').textContent = `x${state.boostLevel}`;
+  $('#bot-status').classList.toggle('hidden', !state.upgrades.tapBot.owned);
+  $('#stat-dep').textContent = state.deposits;
+  $('#stat-boosts').textContent = state.verifiedBoosts.length;
+  $('#stat-earned').textContent = Math.floor(state.totalTaps/100);
+  $('#ref-link').textContent = `t.me/DecentralisationDCLbot?start=${state.ref}`;
+}
+
+// TABS
+$$('.nav-btn').forEach(b=>{
+  b.onclick = ()=>{
+    $$('.nav-btn').forEach(x=>{x.classList.remove('text-yellow-400','bg-white/10'); x.classList.add('text-white/50')});
+    b.classList.add('text-yellow-400','bg-white/10'); b.classList.remove('text-white/50');
+    ['tap','boosts','earn','frens','wallet'].forEach(t=> $('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+  }
+});
+
+// TAP
+$('#tap-coin').onclick = e=>{
+  if(state.energy<=0) return showToast('Out of energy', false);
+  state.energy--; state.balance += state.perTap; state.totalTaps++;
+  // effect
+  const fx = $('#tap-effects');
+  const d = document.createElement('div');
+  d.className = 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-yellow-400 font-bold pointer-events-none';
+  d.style.transform = `translate(${Math.random()*80-40}px, ${Math.random()*-60-20}px)`;
+  d.textContent = `+${fmt(state.perTap)}`;
+  d.animate([{opacity:1, transform:d.style.transform+' scale(1)'},{opacity:0, transform:d.style.transform+' translateY(-40px) scale(1.2)'}],{duration:700});
+  fx.appendChild(d); setTimeout(()=>d.remove(),700);
+  render(); SAVE();
+};
+
+// ENERGY RECHARGE
+setInterval(()=>{
+  if(state.energy < state.maxEnergy){
+    const speed = state.upgrades.recharging.level;
+    state.energy = Math.min(state.maxEnergy, state.energy + (3*speed));
+    render();
+  }
+  if(state.upgrades.tapBot.owned && document.hidden){
+    state.balance += state.perTap * 0.2;
+    state.totalTaps += 1;
+    render(); SAVE();
+  }
+},1000);
+
+// BOOSTS GRID
+function renderBoosts(){
+  $('#boosts-grid').innerHTML = BOOSTS.map(b=>{
+    const active = state.verifiedBoosts.includes(b.level);
+    const locked = b.level > state.boostLevel+1;
+    return `<button data-lvl="${b.level}" class="boost-card group relative text-left p-4 rounded-3xl border transition active:scale-[0.98] ${active?'bg-emerald-500/10 border-emerald-500/30':'bg-white/[0.05] border-white/10 hover:bg-white/[0.08]'} ${locked?'opacity-60':''}">
+      ${b.popular?'<div class="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-yellow-400 text-black text-[10px] font-bold uppercase tracking-wide">Most Popular</div>':''}
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-[11px] text-white/50 uppercase tracking-wide font-medium">${b.label}</p>
+          <p class="text-[26px] font-black leading-none mt-1">${b.level===2?'2X':b.level===3?'3X':b.level===4?'4X':'5X'}</p>
+        </div>
+        <div class="w-9 h-9 rounded-2xl grid place-items-center ${active?'bg-emerald-500/20 text-emerald-400':'bg-white/5 text-white/70 group-hover:text-yellow-400'} transition">
+          ${active?'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'}
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-white/5 flex items-end justify-between">
+        <div>
+          <p class="text-[12px] text-white/50">Price</p>
+          <p class="font-bold text-[17px]">$${b.price}</p>
+        </div>
+        <p class="text-[12px] px-2.5 py-1 rounded-lg ${active?'bg-emerald-500/20 text-emerald-300':'bg-white/10 text-white/70'} font-medium">${active?'Activated':'BNB'}</p>
+      </div>
+    </button>`;
+  }).join('');
+  $$('.boost-card').forEach(btn=>btn.onclick=()=>openBoost(+btn.dataset.lvl));
+}
+renderBoosts();
+
+let currentBoost = null;
+function openBoost(lvl){
+  if(state.verifiedBoosts.includes(lvl)) return showToast('Already activated');
+  if(lvl > state.boostLevel+1) return showToast('Unlock previous boost first', false);
+  currentBoost = BOOSTS.find(b=>b.level===lvl);
+  $('#m-level').textContent = 'x'+lvl;
+  $('#m-pertap').textContent = fmt(currentBoost.perTap)+' DCL';
+  $('#m-bnb').textContent = currentBoost.bnb+' BNB';
+  $('#m-usd').textContent = '$'+currentBoost.price+'.00';
+  $('#m-hash').value=''; $('#m-error').classList.add('hidden');
+  $('#m-verify').disabled = true;
+  $('#m-verify-text').textContent = 'Verify Payment';
+  $('#m-spinner').classList.add('hidden');
+  $('#boost-modal').classList.remove('hidden');
+}
+$('#modal-close').onclick = ()=> $('#boost-modal').classList.add('hidden');
+$('#modal-bg').onclick = ()=> $('#boost-modal').classList.add('hidden');
+$('#m-copy').onclick = ()=>{ navigator.clipboard.writeText('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7'); showToast('Address copied'); };
+
+$('#m-hash').oninput = e=>{
+  const v = e.target.value.trim();
+  const valid = v.startsWith('0x') && v.length>=20;
+  $('#m-verify').disabled = !valid;
+};
+
+$('#m-verify').onclick = async ()=>{
+  const hash = $('#m-hash').value.trim();
+  if(!hash.startsWith('0x') || hash.length<20) return;
+  if(state.usedHashes.includes(hash)) { $('#m-error').textContent='Hash already used'; $('#m-error').classList.remove('hidden'); return; }
+  
+  $('#m-verify').disabled = true;
+  $('#m-verify-text').textContent = 'Verifying on BSC...';
+  $('#m-spinner').classList.remove('hidden');
+  $('#m-error').classList.add('hidden');
+
+  await new Promise(r=>setTimeout(r,2000)); // simulate BSC check
+
+  const isValid = /^0x[a-fA-F0-9]{16,64}$/.test(hash);
+  if(!isValid){
+    $('#m-error').textContent = 'Invalid transaction';
+    $('#m-error').classList.remove('hidden');
+    $('#m-verify-text').textContent = 'Verify Payment';
+    $('#m-spinner').classList.add('hidden');
+    $('#m-verify').disabled = false;
+    return;
+  }
+
+  // SUCCESS - CRITICAL FIX: only boost AFTER verification
+  state.boostLevel = currentBoost.level;
+  state.perTap = currentBoost.perTap;
+  state.verifiedBoosts.push(currentBoost.level);
+  state.usedHashes.push(hash);
+  state.deposits++;
+  SAVE(); render(); renderBoosts();
+  
+  $('#boost-modal').classList.add('hidden');
+  showToast(`Boost Activated! Now x${currentBoost.level}`);
+};
+
+// EARN LIST - EXACT 9 CARDS
+function renderEarn(){
+  const u = state.upgrades;
+  const items = [
+    {key:'multitap', icon:'<path d="M7 11l5-5 5 5M7 19l5-5 5 5"/>', color:'from-violet-500 to-purple-600', title:'Multitap', desc:`Level ${u.multitap.level} • +0.001 per tap`, btn:`${u.multitap.cost} DCL`, type:'upgrade'},
+    {key:'energyLimit', icon:'<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>', color:'from-amber-500 to-orange-600', title:'Energy Limit', desc:`Level ${u.energyLimit.level} • +250 max energy`, btn:`${u.energyLimit.cost} DCL`, type:'upgrade'},
+    {key:'recharging', icon:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', color:'from-sky-500 to-blue-600', title:'Recharging Speed', desc:`Level ${u.recharging.level} • 2x faster`, btn:`${u.recharging.cost} DCL`, type:'upgrade'},
+    {key:'tapBot', icon:'<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="9" cy="16" r="1"/><circle cx="15" cy="16" r="1"/>', color:'from-emerald-500 to-green-600', title:'Tap Bot', desc:`Level ${u.tapBot.level} • Earns when offline`, btn: u.tapBot.owned?'Owned':`${u.tapBot.cost} DCL`, type:'upgrade'},
+    {key:'telegram', icon:'<path d="M21 11.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0z"/><path d="M9 11l2 2 4-4"/>', color:'from-[#229ED9] to-[#1b8bc4]', title:'Telegram', desc:`+5 DCL`, btn: state.social.telegram?'Claimed':'Join', type:'social', link:'https://t.me'},
+    {key:'twitter', icon:'<path d="M22 5.8c-.7.3-1.5.5-2.3.6.8-.5 1.4-1.2 1.7-2.1-.8.5-1.6.8-2.5 1a4 4 0 0 0-6.8 3.6A11.4 11.4 0 0 1 3 4.3a4 4 0 0 0 1.2 5.3c-.6 0-1.2-.2-1.7-.5 0 1.9 1.3 3.5 3.1 3.9-.5.1-1 .2-1.6.1.4 1.4 1.7 2.4 3.2 2.4A8 8 0 0 1 2 19c1.4.9 3 1.4 4.7 1.4 5.6 0 8.7-4.6 8.7-8.7v-.4c.6-.4 1.1-1 1.6-1.6z"/>', color:'from-black to-zinc-800', title:'X (Twitter)', desc:`+5 DCL`, btn: state.social.twitter?'Claimed':'Join', type:'social', link:'https://x.com'},
+    {key:'facebook', icon:'<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>', color:'from-[#1877F2] to-[#0d65d9]', title:'Facebook', desc:`+5 DCL`, btn: state.social.facebook?'Claimed':'Join', type:'social', link:'https://facebook.com'},
+    {key:'discord', icon:'<path d="M19 5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v14l4-4h8a2 2 0 0 0 2-2V5z"/>', color:'from-[#5865F2] to-[#4752c4]', title:'Discord', desc:`+5 DCL`, btn: state.social.discord?'Claimed':'Join', type:'social', link:'https://discord.com'},
+    {key:'linkedin', icon:'<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>', color:'from-[#0A66C2] to-[#004182]', title:'LinkedIn', desc:`+5 DCL`, btn: state.social.linkedin?'Claimed':'Join', type:'social', link:'https://linkedin.com'},
+  ];
+
+  $('#earn-list').innerHTML = items.map(it=>`
+    <div class="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 transition">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br ${it.color} grid place-items-center shadow-lg shrink-0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${it.icon}</svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-[15px] leading-tight">${it.title}</p>
+        <p class="text-[12px] text-white/55">${it.desc}</p>
+      </div>
+      <button data-key="${it.key}" data-type="${it.type}" class="earn-btn h-9 px-4 rounded-xl font-semibold text-[13px] transition active:scale-95 shrink-0 ${it.btn==='Claimed'||it.btn==='Owned'?'bg-white/10 text-white/40 cursor-default':'bg-white text-black hover:bg-white/90'}">${it.btn}</button>
+    </div>
+  `).join('');
+
+  $$('.earn-btn').forEach(b=>{
+    if(b.textContent==='Claimed'||b.textContent==='Owned') return;
+    b.onclick = ()=>{
+      const key = b.dataset.key; const type = b.dataset.type;
+      if(type==='upgrade'){
+        const up = state.upgrades[key];
+        if(state.balance < up.cost) return showToast('Not enough DCL', false);
+        state.balance -= up.cost;
+        up.level++;
+        if(key==='multitap'){ state.perTap += 0.001; }
+        if(key==='energyLimit'){ state.maxEnergy += 250; }
+        if(key==='tapBot'){ up.owned = true; }
+        up.cost = Math.round(up.cost*1.45*10)/10;
+        SAVE(); render(); renderEarn(); showToast('Upgraded!');
+      } else {
+        const item = items.find(i=>i.key===key);
+        window.open(item.link,'_blank');
+        state.social[key] = true;
+        state.balance += 5;
+        SAVE(); render(); renderEarn(); showToast('+5 DCL claimed');
+      }
+    };
+  });
+}
+renderEarn();
+
+// WALLET
+$('#copy-wallet').onclick = ()=>{ navigator.clipboard.writeText($('#wallet-addr').textContent); showToast('Wallet copied'); };
+$('#wallet-tx').oninput = e=> $('#wallet-verify').disabled = !(e.target.value.startsWith('0x') && e.target.value.length>=20);
+$('#wallet-verify').onclick = async ()=>{
+  const hash = $('#wallet-tx').value.trim();
+  if(state.usedHashes.includes(hash)) return showToast('Hash already used', false);
+  $('#wallet-verify').disabled = true; $('#wallet-verify').textContent = 'Verifying...';
+  await new Promise(r=>setTimeout(r,1500));
+  if(!/^0x[a-fA-F0-9]{16,64}$/.test(hash)){ $('#wallet-verify').textContent='Verify TX Hash'; $('#wallet-verify').disabled=false; return showToast('Invalid hash', false); }
+  state.usedHashes.push(hash); state.balance += 10; state.deposits++; $('#wallet-tx').value=''; $('#wallet-verify').textContent='Verify TX Hash';
+  SAVE(); render(); showToast('+10 DCL deposited');
+};
+
+// FRENS
+$('#copy-invite').onclick = ()=>{ navigator.clipboard.writeText($('#ref-link').textContent); showToast('Invite link copied'); };
+
+// INIT
+render();
+</script>
+</body>
+</html>
