@@ -1028,9 +1028,22 @@
         }
 
         // Tasks
+        function handleTask(id){
+  const task = tasks.find(t=>t.id===id);
+  if(task.url){
+    if(window.Telegram?.WebApp){
+      if(task.url.includes('t.me')) Telegram.WebApp.openTelegramLink(task.url);
+      else Telegram.WebApp.openLink(task.url);
+    } else {
+      window.open(task.url,'_blank');
+    }
+  }
+  // then claim reward
+  if(!state.tasks[id]){ state.tasks[id]=true; state.balance+=task.reward; updateUI(); saveState(); }
+        }
         const tasks = [
-            { id: 'tg', name: 'Join $DCL Channel', reward: 0.5, icon: '📢' },
-            { id: 'x', name: 'Follow on X', reward: 0.5, icon: '𝕏' },
+            { id: 'tg', name: 'Join $DCL Channel', reward: 0.5, url: 'https://t.me/dcl_official', icon: '📢' },
+            { id: 'x', name: 'Follow on X', reward: 0.5, url: 'https://x.com/james462864', icon: '𝕏' },
             { id: 'invite3', name: 'Invite 3 Frens', reward: 2, icon: '👥' },
             { id: 'boost', name: 'Upgrade Multitap', reward: 0.3, icon: '👆' }
         ];
@@ -1040,7 +1053,7 @@
             list.innerHTML = tasks.map(task => {
                 const claimed = state.tasks[task.id];
                 return `
-                    <div class="task">
+                    <div class="task" onclick="handleTask('${task.id}')">
                         <div class="task-icon">${task.icon}</div>
                         <div class="task-info">
                             <div class="task-name">${task.name}</div>
