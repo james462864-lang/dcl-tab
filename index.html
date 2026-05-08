@@ -1,197 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- Playables SDK -->
-<script>// Playables SDK v1.0.0
-// Game lifecycle bridge: rAF-based game-ready detection + event communication
-(function() {
-  'use strict';
-
-  // Idempotency: skip if already initialized (e.g., server-side injection
-  // followed by client-side inject-javascript via the Bloks webview component).
-  if (window.playablesSDK) return;
-
-  var HANDLER_NAME = 'playablesGameEventHandler';
-  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
-  var RAF_FRAME_THRESHOLD = 3;
-
-  var gameReadySent = false;
-  var firstInteractionSent = false;
-  var errorSent = false;
-  var frameCount = 0;
-  var originalRAF = window.requestAnimationFrame;
-
-  // --- Transport Layer ---
-
-  function hasIOSBridge() {
-    return !!(window.webkit &&
-              window.webkit.messageHandlers &&
-              window.webkit.messageHandlers[HANDLER_NAME]);
-  }
-
-  function hasAndroidBridge() {
-    return !!(window[ANDROID_BRIDGE_NAME] &&
-              typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function');
-  }
-
-  function isInIframe() {
-    return !!(window.parent && window.parent !== window);
-  }
-
-  function sendEvent(eventName, payload) {
-    var message = {
-      type: eventName,
-      payload: payload || {},
-      timestamp: Date.now()
-    };
-
-    if (hasIOSBridge()) {
-      try {
-        window.webkit.messageHandlers[HANDLER_NAME].postMessage(message);
-      } catch (e) { /* ignore */ }
-      return;
-    }
-
-    if (hasAndroidBridge()) {
-    try {
-      var p = payload || {};
-      p.__secureToken = window.__fbAndroidBridgeAuthToken || '';
-      p.timestamp = message.timestamp;
-      window[ANDROID_BRIDGE_NAME].postEvent(
-        eventName,
-        JSON.stringify(p)
-      );
-    } catch (e) { /* ignore */ }
-    return;
-  }
-
-    if (isInIframe()) {
-      try {
-        window.parent.postMessage(message, '*');
-      } catch (e) { /* ignore */ }
-      return;
-    }
-  }
-
-  // --- rAF Game-Ready Detection ---
-
-  function onFrame() {
-    if (gameReadySent) return;
-
-    frameCount++;
-    if (frameCount >= RAF_FRAME_THRESHOLD) {
-      gameReadySent = true;
-      sendEvent('game_ready', {
-        frame_count: frameCount,
-        detected_at: Date.now()
-      });
-      return;
-    }
-
-    originalRAF.call(window, onFrame);
-  }
-
-  if (originalRAF) {
-    window.requestAnimationFrame = function(callback) {
-      if (!gameReadySent) {
-        return originalRAF.call(window, function(timestamp) {
-          frameCount++;
-          if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) {
-            gameReadySent = true;
-            sendEvent('game_ready', {
-              frame_count: frameCount,
-              detected_at: Date.now()
-            });
-          }
-          callback(timestamp);
-        });
-      }
-      return originalRAF.call(window, callback);
-    };
-  }
-
-  // --- First User Interaction Detection ---
-
-  function setupFirstInteractionDetection() {
-    var events = ['touchstart', 'mousedown', 'keydown'];
-
-    function onFirstInteraction() {
-      if (firstInteractionSent) return;
-      firstInteractionSent = true;
-      sendEvent('user_interaction_start', null);
-
-      for (var i = 0; i < events.length; i++) {
-        document.removeEventListener(events[i], onFirstInteraction, true);
-      }
-    }
-
-    for (var i = 0; i < events.length; i++) {
-      document.addEventListener(events[i], onFirstInteraction, true);
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection);
-  } else {
-    setupFirstInteractionDetection();
-  }
-
-  // --- Auto Error Capture ---
-
-  window.addEventListener('error', function(event) {
-    if (errorSent) return;
-    errorSent = true;
-    sendEvent('error', {
-      message: event.message || 'Unknown error',
-      source: event.filename || '',
-      lineno: event.lineno || 0,
-      colno: event.colno || 0,
-      auto_captured: true
-    });
-  });
-
-  window.addEventListener('unhandledrejection', function(event) {
-    if (errorSent) return;
-    errorSent = true;
-    var reason = event.reason;
-    sendEvent('error', {
-      message: (reason instanceof Error) ? reason.message : String(reason),
-      type: 'unhandled_promise_rejection',
-      auto_captured: true
-    });
-  });
-
-  // --- Public API ---
-
-  window.playablesSDK = {
-    complete: function(score) {
-      sendEvent('game_ended', {
-        score: score,
-        completed: true
-      });
-    },
-
-    error: function(message) {
-      if (errorSent) return;
-      errorSent = true;
-      sendEvent('error', {
-        message: message || 'Unknown error',
-        auto_captured: false
-      });
-    },
-
-    sendEvent: function(eventName, payload) {
-      if (!eventName || typeof eventName !== 'string') return;
-      sendEvent(eventName, payload);
-    }
-  };
-
-  // Kick off rAF detection in case no game code calls rAF immediately
-  if (originalRAF) {
-    originalRAF.call(window, onFrame);
-  }
-})();</script>
-<script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1,user-scalable=no">
 <title>DCL Mining • Decentralised Coin</title>
@@ -352,7 +161,7 @@
       <div class="p-5 rounded-3xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10">
         <p class="text-[12px] text-white/50 mb-2">BSC (BEP20) Deposit Address</p>
         <div class="flex items-center gap-2 p-3 rounded-xl bg-black/50 border border-white/10">
-          <p id="wallet-addr" class="flex-1 text-[13px] font-mono truncate">0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7</p>
+          <p id="wallet-addr" class="flex-1 text-[13px] font-mono truncate">0x6CDA062a90cc9ea61e0Bb099De483610504944C9</p>
           <button id="copy-wallet" class="px-3 py-1.5 rounded-lg bg-white/10 text-[12px] font-medium active:scale-95">Copy</button>
         </div>
         <p class="text-[11px] text-white/40 mt-2">Only send BNB (BSC). Min $1.</p>
@@ -457,7 +266,7 @@
               <p class="text-[12px] text-white/50 mb-1.5">To address (BSC)</p>
               <div class="flex gap-2">
                 <div class="flex-1 px-3.5 h-11 flex items-center rounded-xl bg-black/60 border border-white/10">
-                  <span class="text-[12px] font-mono truncate">0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7</span>
+                  <span class="text-[12px] font-mono truncate">0x6CDA062a90cc9ea61e0Bb099De483610504944C9</span>
                 </div>
                 <button id="m-copy" class="h-11 px-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-[13px] font-medium transition active:scale-95">Copy</button>
               </div>
@@ -636,7 +445,7 @@ function openBoost(lvl){
 }
 $('#modal-close').onclick = ()=> $('#boost-modal').classList.add('hidden');
 $('#modal-bg').onclick = ()=> $('#boost-modal').classList.add('hidden');
-$('#m-copy').onclick = ()=>{ navigator.clipboard.writeText('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7'); showToast('Address copied'); };
+$('#m-copy').onclick = ()=>{ navigator.clipboard.writeText('0x6CDA062a90cc9ea61e0Bb099De483610504944C9'); showToast('Address copied'); };
 
 $('#m-hash').oninput = e=>{
   const v = e.target.value.trim();
@@ -644,38 +453,56 @@ $('#m-hash').oninput = e=>{
   $('#m-verify').disabled = !valid;
 };
 
+// ===== SECURE BACKEND VERIFICATION =====
+const API_URL = 'https://dcl-tab.vercel.app/api/verify'; // <-- REPLACE AFTER DEPLOY
+
 $('#m-verify').onclick = async ()=>{
   const hash = $('#m-hash').value.trim();
-  if(!hash.startsWith('0x') || hash.length<20) return;
-  if(state.usedHashes.includes(hash)) { $('#m-error').textContent='Hash already used'; $('#m-error').classList.remove('hidden'); return; }
+  if(!hash.startsWith('0x') || hash.length<66) {
+    $('#m-error').textContent='Invalid hash (must be 66 chars)'; $('#m-error').classList.remove('hidden'); return;
+  }
+  if(state.usedHashes.includes(hash)) { 
+    $('#m-error').textContent='Hash already used on this device'; $('#m-error').classList.remove('hidden'); return; 
+  }
   
   $('#m-verify').disabled = true;
-  $('#m-verify-text').textContent = 'Verifying on BSC...';
+  $('#m-verify-text').textContent = 'Verifying securely...';
   $('#m-spinner').classList.remove('hidden');
   $('#m-error').classList.add('hidden');
 
-  await new Promise(r=>setTimeout(r,2000)); // simulate BSC check
-
-  const isValid = /^0x[a-fA-F0-9]{16,64}$/.test(hash);
-  if(!isValid){
-    $('#m-error').textContent = 'Invalid transaction';
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        hash, 
+        level: currentBoost.level,
+        userId: state.ref // Telegram user ID
+      })
+    });
+    
+    const data = await res.json();
+    
+    if(!res.ok) throw new Error(data.error || 'Verification failed');
+    
+    // SUCCESS - Server verified
+    state.boostLevel = data.level;
+    state.perTap = data.perTap;
+    state.verifiedBoosts.push(data.level);
+    state.usedHashes.push(hash);
+    state.deposits++;
+    SAVE(); render(); renderBoosts();
+    
+    $('#boost-modal').classList.add('hidden');
+    showToast(`✓ Server Verified! Boost x${data.level}`);
+    
+  } catch(err) {
+    $('#m-error').textContent = err.message;
     $('#m-error').classList.remove('hidden');
     $('#m-verify-text').textContent = 'Verify Payment';
     $('#m-spinner').classList.add('hidden');
     $('#m-verify').disabled = false;
-    return;
   }
-
-  // SUCCESS - CRITICAL FIX: only boost AFTER verification
-  state.boostLevel = currentBoost.level;
-  state.perTap = currentBoost.perTap;
-  state.verifiedBoosts.push(currentBoost.level);
-  state.usedHashes.push(hash);
-  state.deposits++;
-  SAVE(); render(); renderBoosts();
-  
-  $('#boost-modal').classList.add('hidden');
-  showToast(`Boost Activated! Now x${currentBoost.level}`);
 };
 
 // EARN LIST - EXACT 9 CARDS
