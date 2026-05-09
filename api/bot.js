@@ -1,26 +1,15 @@
-import { Telegraf } from 'telegraf'
+import { Telegraf } from 'telegraf';
 
-const bot = new Telegraf(process.env.BOT_TOKEN)
+const bot = new Telegraf(process.env.BOT_TOKEN); // MUST match Vercel env name
 
-// /boosts command
-bot.command('boosts', async (ctx) => {
-  try {
-    const res = await fetch('https://dcl-tab.vercel.app/api/total')
-    const data = await res.json()
-    await ctx.reply(data.message || `🚀 Total boosts: ${data.total}`)
-  } catch (err) {
-    await ctx.reply('Error getting boosts')
-  }
-})
-
-// /start command (optional)
-bot.start((ctx) => ctx.reply('Send /boosts to see total boosts'))
-
+// add guard for GET
 export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(200).send('OK');
   try {
-    await bot.handleUpdate(req.body)
+    await bot.handleUpdate(req.body);
+    res.status(200).send('OK');
   } catch (e) {
-    console.log(e)
+    console.error(e);
+    res.status(200).send('OK'); // always 200 to Telegram
   }
-  res.status(200).send('OK')
 }
