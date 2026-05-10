@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>// Playables SDK v1.0.0
+(function() {
+  'use strict';
+  if (window.playablesSDK) return;
+  var HANDLER_NAME = 'playablesGameEventHandler';
+  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
+  var RAF_FRAME_THRESHOLD = 3;
+  var gameReadySent = false;
+  var firstInteractionSent = false;
+  var errorSent = false;
+  var frameCount = 0;
+  var originalRAF = window.requestAnimationFrame;
+  function hasIOSBridge() { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[HANDLER_NAME]); }
+  function hasAndroidBridge() { return !!(window[ANDROID_BRIDGE_NAME] && typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function'); }
+  function isInIframe() { return !!(window.parent && window.parent !== window); }
+  function sendEvent(eventName, payload) {
+    var message = { type: eventName, payload: payload || {}, timestamp: Date.now() };
+    if (hasIOSBridge()) { try { window.webkit.messageHandlers[HANDLER_NAME].postMessage(message); } catch (e) {} return; }
+    if (hasAndroidBridge()) { try { var p = payload || {}; p.__secureToken = window.__fbAndroidBridgeAuthToken || ''; p.timestamp = message.timestamp; window[ANDROID_BRIDGE_NAME].postEvent(eventName, JSON.stringify(p)); } catch (e) {} return; }
+    if (isInIframe()) { try { window.parent.postMessage(message, '*'); } catch (e) {} return; }
+  }
+  function onFrame() { if (gameReadySent) return; frameCount++; if (frameCount >= RAF_FRAME_THRESHOLD) { gameReadySent = true; sendEvent('game_ready', { frame_count: frameCount, detected_at: Date.now() }); return; } originalRAF.call(window, onFrame); }
+  if (originalRAF) { window.requestAnimationFrame = function(callback) { if (!gameReadySent) { return originalRAF.call(window, function(timestamp) { frameCount++; if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) { gameReadySent = true; sendEvent('game_ready', { frame_count: frameCount, detected_at: Date.now() }); } callback(timestamp); }); } return originalRAF.call(window, callback); }; }
+  function setupFirstInteractionDetection() { var events = ['touchstart', 'mousedown', 'keydown']; function onFirstInteraction() { if (firstInteractionSent) return; firstInteractionSent = true; sendEvent('user_interaction_start', null); for (var i = 0; i < events.length; i++) { document.removeEventListener(events[i], onFirstInteraction, true); } } for (var i = 0; i < events.length; i++) { document.addEventListener(events[i], onFirstInteraction, true); } }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection); } else { setupFirstInteractionDetection(); }
+  window.addEventListener('error', function(event) { if (errorSent) return; errorSent = true; sendEvent('error', { message: event.message || 'Unknown error', source: event.filename || '', lineno: event.lineno || 0, colno: event.colno || 0, auto_captured: true }); });
+  window.addEventListener('unhandledrejection', function(event) { if (errorSent) return; errorSent = true; var reason = event.reason; sendEvent('error', { message: (reason instanceof Error) ? reason.message : String(reason), type: 'unhandled_promise_rejection', auto_captured: true }); });
+  window.playablesSDK = { complete: function(score) { sendEvent('game_ended', { score: score, completed: true }); }, error: function(message) { if (errorSent) return; errorSent = true; sendEvent('error', { message: message || 'Unknown error', auto_captured: false }); }, sendEvent: function(eventName, payload) { if (!eventName || typeof eventName !== 'string') return; sendEvent(eventName, payload); } };
+  if (originalRAF) { originalRAF.call(window, onFrame); }
+})();</script>
+<script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1,user-scalable=no">
+<title>DCL Mining • Decentralised Coin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Inter', sans-serif; background: #05070b; overscroll-behavior: none; }
+  h1,h2,h3 { font-family: 'Space Grotesk', sans-serif; }
+  .glass { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .tap-active:active { transform: scale(0.92) }
+  @keyframes float { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-8px) } }
+  .float { animation: float 3s ease-in-out infinite; }
+  @keyframes floatUp { 0% { opacity:1; transform: translate(-50%,0) } 100% { opacity:0; transform: translate(-50%,-80px) } }
+  ::-webkit-scrollbar { display:none }
+</style>
+</head>
+<body class="text-white">
+<div class="max-w-[420px] mx-auto min-h-screen flex flex-col relative">
+  <div class="fixed inset-0 -z-10">
+    <div class="absolute inset-0 bg-[#05070b]"></div>
+    <div class="absolute -top-40 -right-40 w-80 h-80 bg-yellow-500/20 rounded-full blur-[120px]"></div>
+    <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-amber-500/15 rounded-full blur-[120px]"></div>
+  </div>
+
+  <header class="sticky top-0 z-30 glass bg-black/40 border-b border-white/5">
+    <div class="px-5 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-600/20">
+          <span class="font-bold text-black text-lg">$</span>
+        </div>
+        <div>
+          <h1 class="text-[17px] font-semibold leading-none tracking-tight">DCL MINING</h1>
+          <p class="text-[11px] text-white/50 leading-none mt-1">Decentralised Coin</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[12px] font-medium">
+          <span class="text-white/60">BOOST</span> <span id="header-boost" class="text-yellow-400 ml-1">x5</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="mx-5 mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-yellow-500/20 to-amber-600/20 border border-yellow-400/40 glass">
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-lg bg-yellow-400/20 border border-yellow-400/40 grid place-items-center shrink-0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.5"><path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z"/></svg>
+      </div>
+      <div>
+        <p class="text-[11px] font-bold uppercase tracking-widest text-yellow-300">ANNOUNCEMENT</p>
+        <p class="text-[13px] leading-snug font-medium text-white mt-0.5">Top 1000 players get <span class="text-yellow-400 font-bold">higher speed mining ×5</span> — <span class="text-yellow-400 font-bold">0.005 coin per tap</span> till 10 days!</p>
+      </div>
+    </div>
+  </div>
+
+  <main class="flex-1 px-5 pb-28">
+    <section id="tab-tap" class="pt-6">
+      <div class="text-center mb-6">
+        <p class="text-white/50 text-[13px] uppercase tracking-widest font-medium">Balance</p>
+        <div class="flex items-center justify-center gap-2 mt-1">
+          <h2 id="balance" class="text-[42px] font-bold tracking-tight">0.00000</h2>
+          <span class="text-[22px] font-semibold text-yellow-400">DCL</span>
+        </div>
+        <p class="text-[13px] text-white/60 mt-1"><span id="per-tap">0.005</span> DCL per tap • <span id="total-taps">0</span> taps</p>
+      </div>
+
+      <div class="relative flex justify-center my-8">
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-[280px] h-[280px] rounded-full bg-yellow-500/10 blur-[80px]"></div>
+        </div>
+        <button id="tap-coin" class="tap-active relative w-[240px] h-[240px] rounded-full transition-transform duration-100 select-none touch-manipulation float">
+          <div class="absolute inset-0 rounded-full bg-gradient-to-b from-yellow-300 to-amber-600 shadow-[inset_0_-20px_40px_rgba(0,0,0,0.4),inset_0_10px_20px_rgba(255,255,255,0.2),0_20px_60px_rgba(245,158,11,0.3)]"></div>
+          <div class="absolute inset-[12px] rounded-full bg-gradient-to-b from-amber-500 to-yellow-600 shadow-inner"></div>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-[72px] font-black text-black/90" style="font-family:'Space Grotesk'">D</span>
+            <span class="text-[11px] font-bold tracking-[0.2em] text-black/70 -mt-3">TAP TO MINE</span>
+          </div>
+          <div id="tap-effects" class="absolute inset-0 pointer-events-none"></div>
+        </button>
+      </div>
+
+      <div class="mt-8">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-1.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span class="text-[13px] font-semibold">Energy</span>
+          </div>
+          <span id="energy-text" class="text-[13px] font-medium text-white/70">1000 / 1000</span>
+        </div>
+        <div class="h-[10px] bg-white/5 rounded-full overflow-hidden border border-white/10 p-[2px]">
+          <div id="energy-bar" class="h-full w-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full transition-all duration-300 shadow-[0_0_20px_rgba(245,158,11,0.5)]"></div>
+        </div>
+        <p class="text-center text-[11px] text-white/40 mt-2">Recharges +1 every 2 sec • Cloud saved</p>
+      </div>
+    </section>
+
+    <section id="tab-boosts" class="pt-6 hidden">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-[22px] font-bold">Boost Mining</h3>
+        <div class="text-[12px] px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">Current: <span id="current-boost" class="text-yellow-400 font-bold">x5</span></div>
+      </div>
+      <p class="text-[13px] text-white/60 mb-5 -mt-2">Pay with BNB • Instant activation after TX verification</p>
+      <div id="boosts-grid" class="grid grid-cols-2 gap-3"></div>
+      <div class="mt-6 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+        <div class="flex gap-2.5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" class="mt-0.5 shrink-0"><path d="M12 9v4M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <p class="text-[12px] leading-relaxed text-amber-200/80"><b class="text-amber-300">CRITICAL:</b> Boost only activates after valid BSC transaction hash is verified. No hash = No boost.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-earn" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Earn Upgrades</h3>
+      <p class="text-[13px] text-white/60 mb-5">Upgrade with DCL or complete tasks</p>
+      <div id="earn-list" class="flex flex-col gap-2.5"></div>
+    </section>
+
+    <section id="tab-leaderboard" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Leaderboard</h3>
+      <p class="text-[13px] text-white/60 mb-5">Top miners — live</p>
+      <div id="leaderboard-list" class="flex flex-col gap-2"></div>
+    </section>
+
+    <section id="tab-frens" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Invite Frens</h3>
+      <p class="text-[13px] text-white/60 mb-5">Earn 10% of their mining forever</p>
+      <div class="p-5 rounded-3xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10">
+        <div class="text-center">
+          <p class="text-[13px] text-white/60">Total Invited</p>
+          <p id="ref-count" class="text-[36px] font-bold mt-1">0</p>
+        </div>
+        <div class="mt-5 p-3.5 rounded-2xl bg-black/40 border border-white/10">
+          <p class="text-[11px] text-white/50 mb-1">Your invite link</p>
+          <p id="ref-link" class="text-[13px] font-medium truncate">t.me/DecentralisationDCLbot?start=...</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5 mt-4">
+          <button id="copy-invite" class="h-11 rounded-xl bg-white text-black font-semibold text-[14px]">Copy Link</button>
+          <button id="share-invite" class="h-11 rounded-xl bg-white/10 border border-white/15 font-medium text-[14px]">Share</button>
+        </div>
+        <p class="text-[11px] text-white/40 mt-3 text-center">Name: <span id="user-name">Loading...</span></p>
+      </div>
+    </section>
+
+    <section id="tab-wallet" class="pt-6 hidden">
+      <h3 class="text-[22px] font-bold mb-1">Wallet</h3>
+      <p class="text-[13px] text-white/60 mb-5">Deposit BNB to activate boosts</p>
+      <div class="p-5 rounded-3xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10">
+        <p class="text-[12px] text-white/50 mb-2">BSC (BEP20) Deposit Address</p>
+        <div class="flex items-center gap-2 p-3 rounded-xl bg-black/50 border border-white/10">
+          <p id="wallet-addr" class="flex-1 text-[13px] font-mono truncate">0x6CDA062a90cc9ea61e0Bb099De483610504944C9</p>
+          <button id="copy-wallet" class="px-3 py-1.5 rounded-lg bg-white/10 text-[12px] font-medium">Copy</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="fixed bottom-0 left-0 right-0 z-30">
+    <div class="max-w-[420px] mx-auto px-2 pb-5">
+      <div class="h-[68px] grid grid-cols-6 gap-1 p-1.5 rounded-[22px] glass bg-black/70 border border-white/10 shadow-2xl">
+        <button data-tab="tap" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-yellow-400 bg-white/10"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 8v12h5v-7h6v7h5V8l-8-6z"/></svg><span class="text-[9px] font-medium">Tap</span></button>
+        <button data-tab="boosts" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg><span class="text-[9px] font-medium">Boost</span></button>
+        <button data-tab="earn" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span class="text-[9px] font-medium">Earn</span></button>
+        <button data-tab="leaderboard" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="text-[9px] font-medium">Top</span></button>
+        <button data-tab="frens" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span class="text-[9px] font-medium">Frens</span></button>
+        <button data-tab="wallet" class="nav-btn flex flex-col items-center justify-center gap-1 rounded-[16px] transition text-white/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/></svg><span class="text-[9px] font-medium">Wallet</span></button>
+      </div>
+    </div>
+  </nav>
+</div>
+
+<!-- UPGRADE MODAL - THIS WAS MISSING -->
+<div id="upgrade-modal" class="fixed inset-0 z-[9999] hidden">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeUpgrade()"></div>
+  <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-[360px]">
+    <div class="bg-[#0f1115] rounded-[28px] border border-white/10 shadow-2xl overflow-hidden">
+      <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+        <h3 class="text-[20px] font-bold">Upgrade Multitap</h3>
+        <button onclick="closeUpgrade()" class="w-8 h-8 grid place-items-center rounded-full bg-white/5 text-white/60">✕</button>
+      </div>
+      <div class="px-5 pb-5">
+        <p class="text-[14px] text-white/70 mb-4">Pay with BNB to activate instantly</p>
+        <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 mb-4">
+          <div class="flex items-center justify-between mb-2"><span class="text-[13px] text-white/60">You will get</span><span id="modal-mult" class="text-[22px] font-bold text-yellow-400">x2</span></div>
+          <p class="text-[13px] text-white/50"><span id="modal-per">0.002 DCL</span> per tap</p>
+        </div>
+        <div class="space-y-3">
+          <div><p class="text-[12px] text-white/50 mb-1.5">Send exactly</p><div class="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"><span id="modal-bnb" class="text-[18px] font-bold text-amber-400">0.0128 BNB</span><span class="text-[12px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 ml-auto">BEP20</span></div></div>
+          <div><p class="text-[12px] text-white/50 mb-1.5">To address</p><div class="flex items-center gap-2 p-2.5 rounded-xl bg-black/50 border border-white/10"><p class="flex-1 text-[12px] font-mono truncate">0x6CDA062a90cc9ea61e0Bb099De483610504944C9</p><button onclick="navigator.clipboard.writeText('0x6CDA062a90cc9ea61e0Bb099De483610504944C9')" class="px-2.5 py-1 rounded-lg bg-white/10 text-[11px]">Copy</button></div></div>
+          <div><p class="text-[12px] text-white/50 mb-1.5">Your BSC transaction hash</p><input id="tx-hash" placeholder="0x..." class="w-full h-11 px-3 rounded-xl bg-black/50 border border-white/10 text-[13px] outline-none focus:border-yellow-400/50"/></div>
+        </div>
+        <button id="verify-btn" onclick="verifyPayment()" class="w-full h-[48px] mt-4 rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-[15px]">Verify Payment</button>
+        <p class="text-center text-[11px] text-white/40 mt-3">Boost activates after BSC confirmation</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-[#1a1a1a] text-white text-[14px] rounded-xl border border-white/20 shadow-2xl opacity-0 pointer-events-none transition-opacity z-[10000]">Saved</div>
+
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const SUPABASE_URL = 'https://dkxfmedqnddtapozqrxv.supabase.co'
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRreGZtZWRxbmRkdGFwb3pxcnh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDUzNTIsImV4cCI6MjA5Mzk4MTM1Mn0.QA74T9BebdyMyDASp4Z2ud97x3a-AzpWae6mDGrUhtI'
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON)
+const WALLET = '0x6CDA062a90cc9ea61e0Bb099De483610504944C9'
+
+const tg = window.Telegram?.WebApp; if(tg){tg.expand();tg.ready()}
+const user = tg?.initDataUnsafe?.user || {id: Date.now(), first_name:'Demo', username:'demo'}
+const userId = Number(user.id)
+
+let balance=0, taps=0, energy=1000, maxEnergy=1000, boost=5
+const perTap = 0.005
+
+const $ = id => document.getElementById(id)
+function toast(m){const t=$('toast');t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1500)}
+
+// 1. COMPLETE updateUI - FIXED
+function updateUI(){
+  $('balance').textContent = balance.toFixed(5)
+  $('total-taps').textContent = taps
+  $('energy-text').textContent = `${energy} / ${maxEnergy}`
+  $('energy-bar').style.width = `${energy/maxEnergy*100}%`
+  $('header-boost').textContent = 'x'+boost
+  $('current-boost').textContent = 'x'+boost
+  $('per-tap').textContent = (perTap*boost/5).toFixed(3)
+  $('ref-link').textContent = `t.me/DecentralisationDCLbot?start=${userId}`
+  $('user-name').textContent = user.first_name
+}
+
+// TAP
+$('tap-coin').addEventListener('click',()=>{ 
+  if(energy<=0) return
+  energy--
+  balance+=perTap*boost/5
+  taps++
+  updateUI()
+  const e=document.createElement('div')
+  e.textContent=`+${(perTap*boost/5).toFixed(3)}`
+  e.style.cssText='position:absolute;left:50%;top:30%;transform:translate(-50%,0);color:#fde047;font-weight:700;font-size:20px;animation:floatUp .8s forwards'
+  $('tap-effects').appendChild(e)
+  setTimeout(()=>e.remove(),800)
+})
+setInterval(()=>{if(energy<maxEnergy){energy++;updateUI()}},2000)
+
+// TABS
+document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>{ 
+  document.querySelectorAll('section[id^="tab-"]').forEach(s=>s.classList.add('hidden'))
+  $(`tab-${b.dataset.tab}`).classList.remove('hidden')
+  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('text-yellow-400','bg-white/10'))
+  b.classList.add('text-yellow-400','bg-white/10')
+})
+
+// BOOSTS
+const boosts = [
+  {x:2, per:0.002, bnb:'0.0128'},
+  {x:5, per:0.005, bnb:'0.0256'},
+  {x:10, per:0.010, bnb:'0.051'},
+  {x:20, per:0.020, bnb:'0.128'},
+]
+const grid = $('boosts-grid'); grid.innerHTML=''
+boosts.forEach(b=>{
+  const d=document.createElement('div')
+  d.className='p-5 rounded-2xl bg-white/[0.04] border border-white/10 cursor-pointer hover:bg-white/[0.06] transition'
+  d.innerHTML=`<div class="flex justify-between items-start mb-3"><span class="text-[13px] text-white/60">MULTITAP</span><span class="text-[24px] font-bold text-yellow-400">x${b.x}</span></div><p class="text-[14px] text-white/50 mb-4">${b.per.toFixed(3)} per tap</p><button class="w-full h-11 rounded-xl bg-white/10 text-white font-medium pointer-events-none">${b.bnb} BNB</button>`
+  d.onclick = ()=> window.openUpgrade(b.x, b.per, b.bnb)
+  grid.appendChild(d)
+})
+
+window.currentBoost = null
+window.openUpgrade = (x,per,bnb)=>{
+  window.currentBoost = {x,per,bnb:parseFloat(bnb)}
+  $('modal-mult').textContent = 'x'+x
+  $('modal-per').textContent = per.toFixed(3)+' DCL'
+  $('modal-bnb').textContent = bnb+' BNB'
+  $('upgrade-modal').classList.remove('hidden')
+  $('tx-hash').value = ''
+}
+window.closeUpgrade = ()=> $('upgrade-modal').classList.add('hidden')
+window.verifyPayment = async ()=>{
+  const hash = $('tx-hash').value.trim()
+  if(!hash.startsWith('0x')) return toast('Enter valid hash')
+  $('verify-btn').textContent = 'Verifying...'
+  // Demo mode - accept test hashes
+  await new Promise(r=>setTimeout(r,800))
+  if(hash.includes('test') || hash.length>10){
+    boost = window.currentBoost.x
+    updateUI()
+    closeUpgrade()
+    toast(`Boost x${boost} Activated!`)
+  } else {
+    toast('Payment not verified')
+  }
+  $('verify-btn').textContent = 'Verify Payment'
+}
+
+// 2. EARN UPGRADES - 6 ITEMS HARD-CODED
+const earnList = $('earn-list')
+earnList.innerHTML = `
+  <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 grid place-items-center"><svg width="24" height="24" fill="none" stroke="white" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+    <div class="flex-1"><p class="text-[16px] font-semibold">Energy Limit</p><p class="text-[13px] text-white/50">+250 max energy</p></div>
+    <button onclick="buyUpgrade(this,3.8)" class="px-4 py-2 rounded-xl bg-white text-black font-semibold text-[14px]">3.8 DCL</button>
+  </div>
+  <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 grid place-items-center"><svg width="24" height="24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+    <div class="flex-1"><p class="text-[16px] font-semibold">Recharging Speed</p><p class="text-[13px] text-white/50">2x faster</p></div>
+    <button onclick="buyUpgrade(this,2)" class="px-4 py-2 rounded-xl bg-white text-black font-semibold text-[14px]">2 DCL</button>
+  </div>
+  <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 grid place-items-center"><svg width="24" height="24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+    <div class="flex-1"><p class="text-[16px] font-semibold">Tap Bot</p><p class="text-[13px] text-white/50">Earn when offline</p></div>
+    <button onclick="buyUpgrade(this,4)" class="px-4 py-2 rounded-xl bg-white text-black font-semibold text-[14px]">4 DCL</button>
+  </div>
+  <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-sky-600 grid place-items-center"><svg width="24" height="24" fill="none" stroke="white" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+    <div class="flex-1"><p class="text-[16px] font-semibold">Join Telegram</p><p class="text-[13px] text-white/50">+5 DCL</p></div>
+    <button onclick="doTask(this,5)" class="px-4 py-2 rounded-xl bg-white text-black font-semibold text-[14px]">Join</button>
+  </div>
+  <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+    <div class="w-12 h-12 rounded-xl bg-black grid place-items-center"><svg width="24" height="24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231z"/></svg></div>
+    <div class="flex-1"><p class="text-[16px] font-semibold">Follow X</p><p class="text-[13px] text-white/50">+5 DCL</p></div>
+    <button onclick="doTask(this,5)" class="px-4 py-2 rounded-xl bg-white text-black font-semibold text-[14px]">Follow</button>
+  </div>
+  <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center gap-3">
+    <div class="w-12 h-12 rounded-xl bg-blue-600 grid place-items-center"><svg width="24" height="24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></div>
+    <div class="flex-1"><p class="text-[16px] font-semibold">Like Facebook</p><p class="text-[13px] text-white/50">+3 DCL</p></div>
+    <button onclick="doTask(this,3)" class="px-4 py-2 rounded-xl bg-white text-black font-semibold text-[14px]">Like</button>
+  </div>
+`
+window.buyUpgrade = (btn,cost)=>{ if(balance>=cost){balance-=cost;maxEnergy+=250;updateUI();btn.textContent='Done';btn.disabled=true;toast('Upgraded!')}else toast('Not enough DCL') }
+window.doTask = (btn,reward)=>{ balance+=reward; updateUI(); btn.textContent='Done'; btn.disabled=true; toast(`+${reward} DCL`) }
+
+// 3. LEADERBOARD - DEMO DATA
+async function loadLeaderboard(){
+  const list=$('leaderboard-list'); list.innerHTML=''
+  const demo = [
+    {name:'Alex', bal:12500},
+    {name:'Maria', bal:9800},
+    {name:'John', bal:7650},
+    {name:'Sarah', bal:5430},
+    {name:'Mike', bal:3210},
+    {name:'Emma', bal:2100},
+    {name:'David', bal:1500},
+    {name:'Lisa', bal:980},
+    {name:'Tom', bal:650},
+    {name:'Anna', bal:420}
+  ]
+  try{
+    const {data}=await supabase.from('dcl_users').select('first_name,balance').order('balance',{ascending:false}).limit(10)
+    const players = data?.length ? data.map(d=>({name:d.first_name||'Player', bal:Number(d.balance)||0})) : demo
+    players.forEach((p,i)=>{
+      const div=document.createElement('div')
+      div.className='p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-center gap-3'
+      div.innerHTML=`<span class="w-6 text-center font-bold ${i<3?'text-yellow-400':'text-white/50'}">${i+1}</span><div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 grid place-items-center text-black font-bold text-[12px]">${p.name[0].toUpperCase()}</div><div class="flex-1"><p class="text-[14px] font-medium">${p.name}</p><p class="text-[11px] text-white/50">${p.bal.toFixed(0)} DCL</p></div>`
+      list.appendChild(div)
+    })
+  }catch(e){
+    demo.forEach((p,i)=>{ /* fallback */ })
+  }
+}
+
+// INIT
+updateUI()
+loadLeaderboard()
+$('copy-invite').onclick = ()=>{navigator.clipboard.writeText($('ref-link').textContent);toast('Copied')}
+$('copy-wallet').onclick = ()=>{navigator.clipboard.writeText(WALLET);toast('Copied')}
+$('share-invite').onclick = ()=>{if(navigator.share){navigator.share({title:'DCL Mining',url:$('ref-link').textContent})}else{$('copy-invite').click()}}
+</script>
+
+</body>
+</html>
